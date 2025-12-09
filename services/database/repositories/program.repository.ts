@@ -26,10 +26,12 @@ export const programRepository = {
    */
   async create(name: string, description?: string): Promise<number> {
     const db = getDatabase();
+    console.log('Repository: Creating program in DB:', { name, description });
     const result = await db.runAsync(
       'INSERT INTO programs (name, description) VALUES (?, ?)',
       [name, description || null]
     );
+    console.log('Repository: Insert result:', result);
     return result.lastInsertRowId;
   },
 

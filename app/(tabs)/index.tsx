@@ -1,98 +1,168 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
+import { ProgramCard } from '@/features/programs/components/program-card';
+import { ProgramForm } from '@/features/programs/components/program-form';
+import type { ProgramFormData } from '@/features/programs/schemas/program.schema';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { createProgram, deleteProgram, fetchPrograms } from '@/store/slices/programs.slice';
+import React, { useEffect, useState } from 'react';
+import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
 
-export default function HomeScreen() {
+export default function ProgramsScreen() {
+  const dispatch = useAppDispatch();
+  const { programs, loading, error } = useAppSelector((state) => state.programs);
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+
+  useEffect(() => {
+    console.log('ProgramsScreen mounted, fetching programs...');
+    dispatch(fetchPrograms()).catch((err) => {
+      console.error('Failed to fetch programs in useEffect:', err);
+    });
+  }, [dispatch]);
+
+  // Afficher l'erreur si elle existe
+  useEffect(() => {
+    if (error) {
+      console.error('Programs error state:', error);
+    }
+  }, [error]);
+
+  const handleCreate = async (data: ProgramFormData) => {
+    setIsCreating(true);
+    try {
+      console.log('handleCreate called with:', data);
+      const result = await dispatch(createProgram(data)).unwrap();
+      console.log('Programme créé avec succès:', result);
+      setIsModalVisible(false);
+      // Recharger la liste après création
+      await dispatch(fetchPrograms());
+    } catch (error) {
+      console.error('Erreur lors de la création du programme:', error);
+      alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    await dispatch(deleteProgram(id));
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <ThemedView style={styles.container}>
+      <FlatList
+        data={programs}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => <ProgramCard program={item} onDelete={handleDelete} />}
+        contentContainerStyle={styles.list}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <IconSymbol name="list.bullet.clipboard" size={64} color={colors.tabIconDefault} />
+            {error ? (
+              <>
+                <ThemedText style={[styles.emptyText, { color: '#ef4444' }]}>Erreur</ThemedText>
+                <ThemedText style={styles.emptySubtext}>{error}</ThemedText>
+                <Pressable
+                  style={[styles.retryButton, { backgroundColor: colors.tint }]}
+                  onPress={() => dispatch(fetchPrograms())}>
+                  <ThemedText style={{ color: '#fff', fontWeight: '600' }}>Réessayer</ThemedText>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <ThemedText style={styles.emptyText}>Aucun programme</ThemedText>
+                <ThemedText style={styles.emptySubtext}>
+                  Créez votre premier programme d'entraînement
+                </ThemedText>
+              </>
+            )}
+          </View>
+        }
+        refreshing={loading}
+        onRefresh={() => dispatch(fetchPrograms())}
+      />
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <Pressable
+        style={[styles.fab, { backgroundColor: colors.tint }]}
+        onPress={() => setIsModalVisible(true)}>
+        <IconSymbol name="plus" size={24} color="#fff" />
+      </Pressable>
+
+      <Modal
+        visible={isModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsModalVisible(false)}>
+        <ThemedView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <ThemedText type="title">Nouveau programme</ThemedText>
+          </View>
+          <ProgramForm
+            onSubmit={handleCreate}
+            onCancel={() => setIsModalVisible(false)}
+            submitLabel={isCreating ? "Création..." : "Créer"}
+          />
+        </ThemedView>
+      </Modal>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+  },
+  list: {
+    padding: 16,
+  },
+  emptyContainer: {
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    paddingVertical: 60,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  emptySubtext: {
+    fontSize: 14,
+    opacity: 0.6,
+    marginTop: 8,
+  },
+  fab: {
     position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
   },
 });

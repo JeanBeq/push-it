@@ -6,7 +6,7 @@
 import { Platform } from 'react-native';
 
 const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+const tintColorDark = '#10b981'; // Vert émeraude vif pour le thème sombre
 
 export const Colors = {
   light: {
@@ -16,14 +16,18 @@ export const Colors = {
     icon: '#687076',
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
+    card: '#f9fafb',
+    border: '#e5e7eb',
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    text: '#FFFFFF', // Blanc pur pour un meilleur contraste
+    background: '#0a0a0a', // Noir profond
+    tint: tintColorDark, // Vert émeraude vif
+    icon: '#d1d5db', // Gris clair pour les icônes
+    tabIconDefault: '#9ca3af', // Gris moyen pour les onglets inactifs
+    tabIconSelected: tintColorDark, // Vert émeraude pour les onglets actifs
+    card: '#1a1a1a', // Gris très foncé pour les cards
+    border: '#2a2a2a', // Gris foncé pour les bordures (meilleur contraste)
   },
 };
 
