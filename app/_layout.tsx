@@ -6,6 +6,7 @@ import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 import { Provider } from 'react-redux';
 
+import { ActiveWorkoutBanner } from '@/components/workout/active-workout-banner';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { initDatabase } from '@/services/database';
 import { store } from '@/store/store';
@@ -49,7 +50,9 @@ function RootLayoutNav() {
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         <Stack.Screen name="program/[id]" options={{ title: 'Programme' }} />
         <Stack.Screen name="session/[id]" options={{ title: 'Séance' }} />
+        <Stack.Screen name="workout/[id]" options={{ title: 'Entraînement' }} />
       </Stack>
+      <ActiveWorkoutBanner />
       <StatusBar style="auto" />
     </ThemeProvider>
   );

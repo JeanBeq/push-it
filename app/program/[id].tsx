@@ -6,12 +6,13 @@ import { SessionCard } from '@/features/sessions/components/session-card';
 import { SessionForm } from '@/features/sessions/components/session-form';
 import type { SessionFormData } from '@/features/sessions/schemas/session.schema';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { programRepository } from '@/services/database';
+import { programRepository, sessionExerciseRepository, sessionRepository } from '@/services/database';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
     createSession,
     deleteSession,
     fetchSessionsByProgram,
+    updateSession,
 } from '@/store/slices/sessions.slice';
 import type { Program } from '@/types';
 import { useLocalSearchParams } from 'expo-router';
@@ -26,6 +27,8 @@ export default function ProgramDetailScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const [program, setProgram] = useState<Program | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingSession, setEditingSession] = useState<SessionFormData | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -38,12 +41,38 @@ export default function ProgramDetailScreen() {
   }, [id, dispatch]);
 
   const handleCreateSession = async (data: SessionFormData) => {
-    await dispatch(createSession(data));
+    const { exercises, ...sessionData } = data;
+    if (editingSessionId) {
+      await dispatch(updateSession({ id: editingSessionId, data: sessionData, exercises }));
+    } else {
+      await dispatch(createSession({ session: sessionData, exercises }));
+    }
     setIsModalVisible(false);
+    setEditingSession(null);
+    setEditingSessionId(null);
   };
 
   const handleDeleteSession = async (sessionId: number) => {
     await dispatch(deleteSession(sessionId));
+  };
+
+  const handleEditSession = async (sessionId: number) => {
+    const session = await sessionRepository.getById(sessionId);
+    const details = await sessionExerciseRepository.getDetailsBySessionId(sessionId);
+    if (!session) return;
+    setEditingSession({
+      ...session,
+      exercises: details.map((d) => ({
+        exercise_id: d.exercise_id,
+        name: d.exercise_name,
+        reps: d.reps,
+        sets: d.sets,
+        duration: d.duration,
+        rest_time: d.rest_time,
+      })),
+    } as SessionFormData);
+    setEditingSessionId(sessionId);
+    setIsModalVisible(true);
   };
 
   if (!program) {
@@ -90,7 +119,7 @@ export default function ProgramDetailScreen() {
             <ThemedText type="subtitle">Séances</ThemedText>
             <Pressable
               style={[styles.addButton, { backgroundColor: colors.tint }]}
-              onPress={() => setIsModalVisible(true)}>
+              onPress={() => { setEditingSession(null); setEditingSessionId(null); setIsModalVisible(true); }}>
               <IconSymbol name="plus" size={20} color="#fff" />
               <ThemedText style={styles.addButtonText}>Ajouter</ThemedText>
             </Pressable>
@@ -103,7 +132,7 @@ export default function ProgramDetailScreen() {
             </View>
           ) : (
             sessions.map((session: any) => (
-              <SessionCard key={session.id} session={session} onDelete={handleDeleteSession} />
+              <SessionCard key={session.id} session={session} onDelete={handleDeleteSession} onEdit={handleEditSession} />
             ))
           )}
         </View>
@@ -113,15 +142,16 @@ export default function ProgramDetailScreen() {
         visible={isModalVisible}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setIsModalVisible(false)}>
+        onRequestClose={() => { setIsModalVisible(false); setEditingSession(null); setEditingSessionId(null); }}>
         <ThemedView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <ThemedText type="title">Nouvelle séance</ThemedText>
+            <ThemedText type="title">{editingSessionId ? 'Modifier la séance' : 'Nouvelle séance'}</ThemedText>
           </View>
           <SessionForm
             onSubmit={handleCreateSession}
-            onCancel={() => setIsModalVisible(false)}
-            submitLabel="Créer"
+            onCancel={() => { setIsModalVisible(false); setEditingSession(null); setEditingSessionId(null); }}
+            submitLabel={editingSessionId ? 'Mettre à jour' : 'Créer'}
+            defaultValues={editingSession ?? { program_id: id ? parseInt(id, 10) : null }}
             programId={parseInt(id!, 10)}
           />
         </ThemedView>

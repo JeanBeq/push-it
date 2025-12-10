@@ -1,4 +1,5 @@
-import { sessionRepository } from '@/services/database';
+import type { SessionExerciseFormData } from '@/features/sessions/schemas/session.schema';
+import { exerciseRepository, sessionExerciseRepository, sessionRepository } from '@/services/database';
 import type { Session } from '@/types';
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 
@@ -28,8 +29,38 @@ export const fetchSessionsByProgram = createAsyncThunk(
 
 export const createSession = createAsyncThunk(
   'sessions/create',
-  async (session: Omit<Session, 'id' | 'created_at'>) => {
+  async ({ session, exercises }: { session: Omit<Session, 'id' | 'created_at'>; exercises: SessionExerciseFormData[] }) => {
     const id = await sessionRepository.create(session);
+
+    const preparedExercises = [] as {
+      exercise_id: number;
+      order_index: number;
+      sets?: number | null;
+      reps?: number | null;
+      duration?: number | null;
+      rest_time?: number | null;
+    }[];
+
+    for (let i = 0; i < exercises.length; i++) {
+      const item = exercises[i];
+      let exerciseId = item.exercise_id;
+      if (!exerciseId) {
+        exerciseId = await exerciseRepository.create(item.name, 'other');
+      }
+      preparedExercises.push({
+        exercise_id: exerciseId,
+        order_index: i,
+        sets: item.sets ?? null,
+        reps: item.reps ?? null,
+        duration: item.duration ?? null,
+        rest_time: item.rest_time ?? null,
+      });
+    }
+
+    if (preparedExercises.length > 0) {
+      await sessionExerciseRepository.replaceForSession(id, preparedExercises);
+    }
+
     const newSession = await sessionRepository.getById(id);
     return newSession!;
   }
@@ -37,8 +68,38 @@ export const createSession = createAsyncThunk(
 
 export const updateSession = createAsyncThunk(
   'sessions/update',
-  async ({ id, data }: { id: number; data: Partial<Omit<Session, 'id' | 'created_at'>> }) => {
+  async ({ id, data, exercises }: { id: number; data: Partial<Omit<Session, 'id' | 'created_at'>>; exercises?: SessionExerciseFormData[] }) => {
     await sessionRepository.update(id, data);
+
+    if (exercises) {
+      const preparedExercises = [] as {
+        exercise_id: number;
+        order_index: number;
+        sets?: number | null;
+        reps?: number | null;
+        duration?: number | null;
+        rest_time?: number | null;
+      }[];
+
+      for (let i = 0; i < exercises.length; i++) {
+        const item = exercises[i];
+        let exerciseId = item.exercise_id;
+        if (!exerciseId) {
+          exerciseId = await exerciseRepository.create(item.name, 'other');
+        }
+        preparedExercises.push({
+          exercise_id: exerciseId,
+          order_index: i,
+          sets: item.sets ?? null,
+          reps: item.reps ?? null,
+          duration: item.duration ?? null,
+          rest_time: item.rest_time ?? null,
+        });
+      }
+
+      await sessionExerciseRepository.replaceForSession(id, preparedExercises);
+    }
+
     const session = await sessionRepository.getById(id);
     return session!;
   }
