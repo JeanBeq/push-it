@@ -2,10 +2,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { exerciseRepository } from '@/services/database';
 import type { RecurrenceType, SessionType } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
-import React from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { sessionSchema, type SessionFormData } from '../schemas/session.schema';
 
@@ -39,10 +40,13 @@ export function SessionForm({
 }: SessionFormProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const [availableExercises, setAvailableExercises] = useState<{ id: number; name: string }[]>([]);
+  const [customExerciseName, setCustomExerciseName] = useState('');
 
   const {
     control,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<SessionFormData>({
     resolver: zodResolver(sessionSchema),
@@ -54,9 +58,51 @@ export function SessionForm({
       scheduled_time: null,
       recurrence: 'none',
       duration: null,
+      exercises: [],
       ...defaultValues,
     },
   });
+
+  useEffect(() => {
+    if (defaultValues) {
+      reset({
+        program_id: defaultValues.program_id ?? programId ?? null,
+        name: defaultValues.name ?? '',
+        type: defaultValues.type ?? 'AMRAP',
+        scheduled_date: defaultValues.scheduled_date ?? null,
+        scheduled_time: defaultValues.scheduled_time ?? null,
+        recurrence: defaultValues.recurrence ?? 'none',
+        duration: defaultValues.duration ?? null,
+        exercises: defaultValues.exercises ?? [],
+      });
+    }
+  }, [defaultValues, programId, reset]);
+
+  const { fields, append, remove, update } = useFieldArray({ control, name: 'exercises' });
+
+  useEffect(() => {
+    exerciseRepository.getAll().then((list) => {
+      setAvailableExercises(list.map((item) => ({ id: item.id, name: item.name })));
+    });
+  }, []);
+
+  const selectedIds = useMemo(() => new Set(fields.map((f) => f.exercise_id)), [fields]);
+
+  const toggleExercise = (exerciseId: number, name: string) => {
+    const idx = fields.findIndex((f) => f.exercise_id === exerciseId);
+    if (idx >= 0) {
+      remove(idx);
+    } else {
+      append({ exercise_id: exerciseId, name, reps: null, sets: null, duration: null, rest_time: null });
+    }
+  };
+
+  const addCustomExercise = () => {
+    const trimmed = customExerciseName.trim();
+    if (!trimmed) return;
+    append({ name: trimmed, reps: null, sets: null, duration: null, rest_time: null });
+    setCustomExerciseName('');
+  };
 
   return (
     <ScrollView style={styles.scrollView}>
@@ -238,6 +284,83 @@ export function SessionForm({
           />
         </View>
 
+        <View style={styles.field}>
+          <ThemedText style={styles.label}>Exercices de la séance *</ThemedText>
+          <ThemedText style={styles.helper}>Choisissez dans la liste ou ajoutez le vôtre.</ThemedText>
+
+          <View style={styles.exerciseGrid}>
+            {availableExercises.map((exo) => {
+              const active = selectedIds.has(exo.id);
+              return (
+                <Pressable
+                  key={exo.id}
+                  style={[
+                    styles.exerciseChip,
+                    {
+                      borderColor: active ? colors.tint : colors.border,
+                      backgroundColor: active ? colors.tint + '15' : colors.card,
+                    },
+                  ]}
+                  onPress={() => toggleExercise(exo.id, exo.name)}>
+                  <ThemedText style={[styles.exerciseChipText, active && { color: colors.tint }]}>
+                    {exo.name}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={styles.customRow}>
+            <TextInput
+              placeholder="Ajouter un exercice perso"
+              placeholderTextColor={colors.tabIconDefault}
+              value={customExerciseName}
+              onChangeText={setCustomExerciseName}
+              style={[styles.input, { flex: 1, backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+            />
+            <Pressable style={[styles.addButton, { backgroundColor: colors.tint }]} onPress={addCustomExercise}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Ajouter</Text>
+            </Pressable>
+          </View>
+
+          {errors.exercises && (
+            <ThemedText style={styles.errorText}>{errors.exercises.message as string}</ThemedText>
+          )}
+
+          {fields.length > 0 && (
+            <View style={styles.selectedList}>
+              {fields.map((field, index) => (
+                <View key={field.id} style={[styles.selectedItem, { borderColor: colors.border }]}> 
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={styles.selectedTitle}>{field.name}</ThemedText>
+                    <ThemedText style={styles.helper}>Répétitions cibles (optionnel)</ThemedText>
+                  </View>
+                  <Controller
+                    control={control}
+                    name={`exercises.${index}.reps`}
+                    render={({ field: { onChange, value } }) => (
+                      <TextInput
+                        keyboardType="number-pad"
+                        value={value?.toString() ?? ''}
+                        onChangeText={(text) => {
+                          const num = parseInt(text, 10);
+                          onChange(Number.isNaN(num) ? null : num);
+                        }}
+                        style={[styles.repsInput, { borderColor: colors.border, color: colors.text }]}
+                        placeholder="0"
+                        placeholderTextColor={colors.tabIconDefault}
+                      />
+                    )}
+                  />
+                  <Pressable onPress={() => remove(index)} style={styles.removeButton}>
+                    <Text style={{ color: '#ef4444', fontWeight: '700' }}>Suppr.</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
         <View style={styles.buttonContainer}>
           <Pressable
             style={[styles.button, styles.cancelButton, { backgroundColor: colors.tabIconDefault }]}
@@ -321,6 +444,63 @@ const styles = StyleSheet.create({
   },
   recurrenceLabel: {
     fontSize: 14,
+  },
+  helper: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginBottom: 8,
+  },
+  exerciseGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  exerciseChip: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  exerciseChipText: {
+    fontWeight: '600',
+  },
+  customRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  addButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  selectedList: {
+    gap: 10,
+  },
+  selectedItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+  },
+  selectedTitle: {
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  repsInput: {
+    width: 70,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 8,
+    textAlign: 'center',
+  },
+  removeButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
   buttonContainer: {
     flexDirection: 'row',
