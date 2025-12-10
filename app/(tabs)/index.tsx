@@ -14,6 +14,7 @@ import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
 export default function ProgramsScreen() {
   const dispatch = useAppDispatch();
   const { programs, loading, error } = useAppSelector((state) => state.programs);
+  const hasActiveWorkout = useAppSelector((state) => Boolean(state.workout.activeSessionId));
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -89,7 +90,7 @@ export default function ProgramsScreen() {
       />
 
       <Pressable
-        style={[styles.fab, { backgroundColor: colors.tint }]}
+        style={[styles.fab, { backgroundColor: colors.tint, bottom: hasActiveWorkout ? 120 : 24 }]}
         onPress={() => setIsModalVisible(true)}>
         <IconSymbol name="plus" size={24} color="#fff" />
       </Pressable>
