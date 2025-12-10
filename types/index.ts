@@ -48,6 +48,11 @@ export interface SessionExercise {
   rest_time: number | null;
 }
 
+export interface SessionExerciseDetail extends SessionExercise {
+  exercise_name: string;
+  exercise_category: ExerciseCategory;
+}
+
 // Historique d'une séance effectuée
 export interface SessionLog {
   id: number;
