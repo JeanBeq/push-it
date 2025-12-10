@@ -1,6 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { Card } from '@/components/ui/card';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { SessionTypeBadge } from '@/components/ui/session-type-badge';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { Session } from '@/types';
@@ -11,15 +12,10 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 interface SessionCardProps {
   session: Session;
   onDelete: (id: number) => void;
+  onEdit?: (id: number) => void;
 }
 
-const TYPE_COLORS = {
-  AMRAP: '#3b82f6',
-  HIIT: '#ef4444',
-  EMOM: '#8b5cf6',
-};
-
-export function SessionCard({ session, onDelete }: SessionCardProps) {
+export function SessionCard({ session, onDelete, onEdit }: SessionCardProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
@@ -33,6 +29,11 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
         onPress: () => onDelete(session.id),
       },
     ]);
+  };
+
+  const handleEdit = (e: any) => {
+    e.stopPropagation();
+    onEdit?.(session.id);
   };
 
   const handlePress = () => {
@@ -51,18 +52,18 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
 
   return (
     <Pressable onPress={handlePress}>
-      <ThemedView style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Card>
         <View style={styles.content}>
           <View style={styles.header}>
-            <View
-              style={[styles.typeBadge, { backgroundColor: TYPE_COLORS[session.type] + '20' }]}>
-              <ThemedText style={[styles.typeText, { color: TYPE_COLORS[session.type] }]}>
-                {session.type}
-              </ThemedText>
+            <SessionTypeBadge type={session.type} />
+            <View style={styles.actions}>
+              <Pressable onPress={handleEdit} style={styles.iconButton} hitSlop={8}>
+                <IconSymbol name="pencil" size={18} color={colors.icon} />
+              </Pressable>
+              <Pressable onPress={handleDelete} style={styles.iconButton} hitSlop={8}>
+                <IconSymbol name="trash" size={20} color="#ef4444" />
+              </Pressable>
             </View>
-            <Pressable onPress={handleDelete} style={styles.deleteButton} hitSlop={8}>
-              <IconSymbol name="trash" size={20} color="#ef4444" />
-            </Pressable>
           </View>
 
           <ThemedText type="subtitle" style={styles.title}>
@@ -94,18 +95,12 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
             )}
           </View>
         </View>
-      </ThemedView>
+      </Card>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
-    overflow: 'hidden',
-  },
   content: {
     padding: 16,
   },
@@ -115,16 +110,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  typeBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  typeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  deleteButton: {
+  iconButton: {
     padding: 8,
   },
   title: {
