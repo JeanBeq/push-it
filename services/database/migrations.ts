@@ -2,7 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { CREATE_TABLES } from './schema';
 
 // Version actuelle de la base de données
-const CURRENT_DB_VERSION = 1;
+const CURRENT_DB_VERSION = 2;
 
 /**
  * Récupère la version actuelle de la base de données
@@ -51,6 +51,37 @@ async function migrateToV1(db: SQLiteDatabase): Promise<void> {
 }
 
 /**
+ * Migration v1 -> v2 : Seed d'exercices de base
+ */
+async function migrateToV2(db: SQLiteDatabase): Promise<void> {
+  console.log('📦 Running migration v1 -> v2 (seed exercises)...');
+
+  const defaults = [
+    { name: 'Pompes', category: 'strength', description: 'Pompes classiques au sol' },
+    { name: 'Squats', category: 'strength', description: 'Squat poids du corps' },
+    { name: 'Fentes', category: 'strength', description: 'Fentes alternées' },
+    { name: 'Burpees', category: 'cardio', description: 'Burpees complets' },
+    { name: 'Mountain Climbers', category: 'cardio', description: 'Gainage dynamique' },
+    { name: 'Planche', category: 'strength', description: 'Planche statique' },
+    { name: 'Abdos crunch', category: 'strength', description: 'Crunch abdominaux' },
+    { name: 'Jumping Jacks', category: 'cardio', description: 'Jumping jacks' },
+    { name: 'Développé militaire', category: 'strength', description: 'Développé militaire avec haltères' },
+    { name: 'Tractions', category: 'strength', description: 'Tractions à la barre fixe' },
+    { name: 'Corde à sauter', category: 'cardio', description: 'Sauter à la corde' },
+    { name: 'Développé couché', category: 'strength', description: 'Développé couché avec barre' },
+  ];
+
+  for (const ex of defaults) {
+    await db.runAsync(
+      'INSERT OR IGNORE INTO exercises (name, category, description, is_custom) VALUES (?, ?, ?, 0)',
+      [ex.name, ex.category, ex.description]
+    );
+  }
+
+  console.log('✅ Migration v2 completed (seed exercises)');
+}
+
+/**
  * Exécute toutes les migrations nécessaires
  */
 export async function runMigrations(db: SQLiteDatabase): Promise<void> {
@@ -68,6 +99,11 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
     if (currentVersion < 1) {
       await migrateToV1(db);
       await updateVersion(db, 1);
+    }
+
+    if (currentVersion < 2) {
+      await migrateToV2(db);
+      await updateVersion(db, 2);
     }
 
     // Ajouter ici les futures migrations :
